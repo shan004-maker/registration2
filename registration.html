@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Registration</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-image: url(Avishkainal-01.jpg);
+            background-size: 402px;
+            background-color: #f0f8ff;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+        }
+        h1 {
+            color: #5b3e1b;
+            text-align: center;
+        }
+        input, select {
+            padding: 10px;
+            margin: 10px 0;
+            width: 97%;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+        }
+        .button {
+            padding: 10px 20px;
+            background-color: #5b3e1b;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .button:hover {
+            background-color: #3e2a1b;
+        }
+        .student-list {
+            margin-top: 20px;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        table, th, td {
+            border: 1px solid #ccc;
+        }
+        th, td {
+            padding: 10px;
+            text-align: center;
+        }
+        .search-bar {
+            width: 50%;
+            margin: 10px 0;
+        }
+        .total-payment {
+            margin-top: 20px;
+            text-align: center;
+        }
+        label {
+            font-weight: bold;
+            margin-top: 10px;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+<body>
+
+<div class="container">
+    <h1>Student Registration</h1>
+    
+    <label for="studentName">Student Name</label>
+    <input type="text" id="studentName" placeholder="Enter Student Name" />
+    
+    <label for="studentID">Student ID</label>
+    <input type="text" id="studentID" placeholder="Enter Student ID" />
+    
+    <label for="paymentAmount">Payment Amount (LKR)</label>
+    <input type="number" id="paymentAmount" placeholder="Enter Payment Amount" />
+    
+    <label for="registerDate">Registered Date</label>
+    <input type="date" id="registerDate" />
+    
+    <label for="expiryDate">Expiry Date</label>
+    <input type="date" id="expiryDate" />
+    
+    <label for="isUnpaid">Unpaid</label>
+    <input type="checkbox" id="isUnpaid" />
+    
+    <button class="button" onclick="addStudent()">Register Student</button>
+
+    <input type="text" class="search-bar" id="searchBox" onkeyup="searchStudent()" placeholder="Search by Name or ID">
+    
+    <div>
+        <button class="button" onclick="filterPaidStudents()">Show Paid Students</button>
+        <button class="button" onclick="filterUnpaidStudents()">Show Unpaid Students</button>
+        <button class="button" onclick="showAllStudents()">Show All Students</button>
+    </div>
+
+    <div class="student-list">
+        <h3>Registered Students</h3>
+        <table id="studentTable">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>ID</th>
+                    <th>Registered Date</th>
+                    <th>Expiry Date</th>
+                    <th>Payment Amount (LKR)</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- Student records will appear here -->
+            </tbody>
+        </table>
+    </div>
+
+    <div class="total-payment">
+        <p>Total Paid Amount (LKR): LKR <span id="totalPaid">0</span></p>
+        <p>Total Received Amount (LKR): LKR <span id="totalReceived">0</span></p>
+        <p>Total Unpaid Students: <span id="totalUnpaid">0</span></p>
+    </div>
+
+    <button class="button" onclick="clearAllStudents()">Clear All Students for New Month</button>
+    <button class="button" onclick="saveAsPDF()">Save Student History as PDF</button>
+</div>
+
+<script>
+// Load existing students data and total amounts from localStorage
+window.onload = function() {
+    loadStoredData();  // Call this function when the page is loaded
+};
+
+// Function to load students from localStorage
+function loadStoredData() {
+    const students = JSON.parse(localStorage.getItem('students')) || [];
+    displayStudents(students);
+
+    const totalPaid = parseFloat(localStorage.getItem('totalPaid')) || 0;
+    const totalReceived = parseFloat(localStorage.getItem('totalReceived')) || 0;
+
+    document.getElementById('totalPaid').textContent = totalPaid.toFixed(2);
+    document.getElementById('totalReceived').textContent = totalReceived.toFixed(2);
+    updateUnpaidCount();
+}
+
+// Function to add a student
+function addStudent() {
+    const name = document.getElementById('studentName').value;
+    const id = document.getElementById('studentID').value;
+    const paymentAmount = parseFloat(document.getElementById('paymentAmount').value);
+    const registerDate = document.getElementById('registerDate').value;
+    const expiryDate = document.getElementById('expiryDate').value;
+    const isUnpaid = document.getElementById('isUnpaid').checked;
+
+    if (name && id && registerDate && expiryDate) {
+        let students = JSON.parse(localStorage.getItem('students')) || [];
+        
+        // If unpaid, set payment amount to 0
+        const payment = isUnpaid ? 0 : paymentAmount;
+
+        students.push({ name, id, payment, registerDate, expiryDate });
+        localStorage.setItem('students', JSON.stringify(students));
+
+        updateTotalPayments(payment);
+        displayStudents(students);
+        updateUnpaidCount();
+        clearForm();
+    } else {
+        alert("Please fill out all fields");
+    }
+}
+
+// Function to update the total paid and received amounts
+function updateTotalPayments(paymentAmount) {
+    let totalPaid = parseFloat(localStorage.getItem('totalPaid')) || 0;
+    let totalReceived = parseFloat(localStorage.getItem('totalReceived')) || 0;
+
+    totalPaid += paymentAmount;
+    totalReceived += paymentAmount;
+
+    localStorage.setItem('totalPaid', totalPaid);
+    localStorage.setItem('totalReceived', totalReceived);
+
+    document.getElementById('totalPaid').textContent = totalPaid.toFixed(2);
+    document.getElementById('totalReceived').textContent = totalReceived.toFixed(2);
+}
+
+// Function to update the count of unpaid students
+function updateUnpaidCount() {
+    const students = JSON.parse(localStorage.getItem('students')) || [];
+    const unpaidCount = students.filter(student => student.payment <= 0).length;
+    document.getElementById('totalUnpaid').textContent = unpaidCount;
+}
+
+// Function to display students
+function displayStudents(students) {
+    const studentTable = document.getElementById('studentTable').getElementsByTagName('tbody')[0];
+    studentTable.innerHTML = '';
+
+    if (students.length === 0) {
+        const row = studentTable.insertRow();
+        const cell = row.insertCell();
+        cell.colSpan = 6;
+        cell.textContent = "No students registered.";
+    } else {
+        students.forEach((student, index) => {
+            const row = studentTable.insertRow();
+            row.innerHTML = `
+                <td>${student.name}</td>
+                <td>${student.id}</td>
+                <td>${student.registerDate}</td>
+                <td>${student.expiryDate}</td>
+                <td>LKR ${student.payment.toFixed(2)}</td>
+                <td><button onclick="deleteStudent(${index})">Delete</button></td>
+            `;
+        });
+    }
+}
+
+// Function to delete a student
+function deleteStudent(index) {
+    let students = JSON.parse(localStorage.getItem('students')) || [];
+    students.splice(index, 1);
+    localStorage.setItem('students', JSON.stringify(students));
+    displayStudents(students);
+    updateUnpaidCount();
+}
+
+// Function to search students by name or ID
+function searchStudent() {
+    const searchQuery = document.getElementById('searchBox').value.toLowerCase();
+    const students = JSON.parse(localStorage.getItem('students')) || [];
+    const filteredStudents = students.filter(student =>
+        student.name.toLowerCase().includes(searchQuery) || student.id.includes(searchQuery)
+    );
+
+    displayStudents(filteredStudents);
+}
+
+// Function to remove all students for a new month
+function clearAllStudents() {
+    localStorage.removeItem('students');
+    localStorage.removeItem('totalPaid');
+    localStorage.removeItem('totalReceived');
+    displayStudents([]);
+    updateUnpaidCount();
+
+    document.getElementById('totalPaid').textContent = "0";
+    document.getElementById('totalReceived').textContent = "0";
+}
+
+// Save as PDF function using jsPDF
+function saveAsPDF() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+    doc.text('Student Registration History', 10, 10);
+
+    const studentTable = document.getElementById('studentTable');
+    const rows = Array.from(studentTable.rows).map(row => 
+        Array.from(row.cells).map(cell => cell.textContent)
+    );
+
+    let y = 20;
+    rows.forEach((row, index) => {
+        doc.text(row.join(' | '), 10, y);
+        y += 10;
+    });
+
+    doc.save('Student_History.pdf');
+}
+</script>
+</body>
+</html>
